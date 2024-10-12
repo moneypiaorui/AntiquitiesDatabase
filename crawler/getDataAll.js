@@ -112,7 +112,7 @@ const downloadImage = async (imageUrl, filePath) => {
 
         // 否则，递增 index 并下载图片
         const newIndex = maxIndex + 1;
-        const imgPath = path.join(folderPath, `${newIndex}.jpg`);
+        const imgPath = path.join(folderPath, `${newIndex}${path.extname(imgSrc)}`);
 
         // 确保 URL 完整
         const imageUrl = imgSrc.startsWith('http') ? imgSrc : `http://data.shouxi.com/${imgSrc}`;
