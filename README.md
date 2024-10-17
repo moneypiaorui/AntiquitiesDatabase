@@ -32,6 +32,10 @@
 4. 若要启动app.js，先切换conda环境`conda activate Antidb`再输入`node ./server/app.js`启动后端服务，端口4000
 ### nextjs
 - cd到Nextjs下，`npm run dev`启动开发环境，端口3000
+- 在配置文件next.config.mjs中添加output: 'export'，方便后续打包成静态资源
+- `npm run build`进行打包，如果报很多错可以把eslinetrc.json删了
+- 打包完成后既可以`npm run start`通过node启动，也可以把out/下的资源放到web服务器上
+- 开发环境通过代理将相对路径的请求转发到localhost上，具体见`next.config.js`文件配置
 
 ## 代码结构
 ### crawler

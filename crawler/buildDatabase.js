@@ -6,6 +6,15 @@ const path = require('path');
 const pinyin = require('pinyin').default;
 const sqlite3 = require('sqlite3').verbose();
 const util = require('util');
+const cloudinary = require('cloudinary').v2;
+const crypto = require('crypto');
+
+// Cloudinary配置
+cloudinary.config({
+    cloud_name: 'dqoviiksy',
+    api_key: '727428776932496',
+    api_secret: 'pt7gHpOlqVLXFjOBAbOkHDA_OsQ'
+});
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -30,12 +39,12 @@ const downloadImage = async (imageUrl, filePath) => {
 
 // 创建数据库连接
 const db = new sqlite3.Database(path.join(__dirname, 'item.db'), (err) => {
-  if (err) {
-    console.error('无法连接到数据库:', err.message);
-  } else {
-    console.log('已连接到 SQLite 数据库');
-    // 创建 item 表，将 pid 设置为整数类型的主键
-    db.run(`CREATE TABLE IF NOT EXISTS item (
+    if (err) {
+        console.error('无法连接到数据库:', err.message);
+    } else {
+        console.log('已连接到 SQLite 数据库');
+        // 创建 item 表，将 pid 设置为整数类型的主键
+        db.run(`CREATE TABLE IF NOT EXISTS item (
       url TEXT,
       pid INTEGER PRIMARY KEY,
       c0 TEXT,
@@ -46,10 +55,10 @@ const db = new sqlite3.Database(path.join(__dirname, 'item.db'), (err) => {
       c5 TEXT,
       text TEXT
     )`);
-  }
+    }
 });
-
-const itemNum = 1000
+ 
+const itemNum = 500
 const batchSize = 500;
 
 const dbGet = util.promisify(db.get.bind(db));
@@ -62,6 +71,30 @@ async function updateClassificationJson(classification) {
     console.log('已更新 classification.json');
 }
 
+// 上传图片到Cloudinary的函数
+async function uploadToCloudinary(imageUrl) {
+    try {
+        // 使用图片URL的MD5哈希作为public_id
+        const publicId = crypto.createHash('md5').update(imageUrl).digest('hex');
+        
+        const result = await cloudinary.uploader.upload(imageUrl, {
+            folder: 'antidb',
+            public_id: publicId,
+            overwrite: false, // 不覆盖已存在的图片
+            unique_filename: false // 使用指定的public_id
+        });
+        return result.secure_url;
+    } catch (error) {
+        if (error.http_code === 400 && error.message.includes('Resource already exists')) {
+            // 如果图片已存在，获取现有图片的URL
+            const existingImage = await cloudinary.api.resource(publicId, { type: 'upload', prefix: 'antidb' });
+            return existingImage.secure_url;
+        }
+        console.error('上传到Cloudinary时出错:', error);
+        return null;
+    }
+}
+
 (async () => {
     // 修改per_page改变数据获取数量
     const response = await axios.get(`http://data.shouxi.com/item_list.php?a=s&c_cid=1&cid=1&list_type=0&per_page=${itemNum}`)
@@ -69,14 +102,14 @@ async function updateClassificationJson(classification) {
     const $$ = cheerio.load(html);
     pid_list = []
     // 获取所有pid
-    $$('div.auctionListUl>div.auctionListUlItem>ul>li>div>div.imgBox>a').each(async(index, element) => {
+    $$('div.auctionListUl>div.auctionListUlItem>ul>li>div>div.imgBox>a').each(async (index, element) => {
         pid = $$(element).attr('href').split('=')[1]
         pid_list.push(pid)
     });
 
     let count = 0;
     let batchCount = 0;
-    
+
     let classification = {};
 
     try {
@@ -87,7 +120,7 @@ async function updateClassificationJson(classification) {
         console.log('创建新的 classification 对象');
     }
 
-    for(pid of pid_list){
+    for (pid of pid_list) {
         count++;
         batchCount++;
         console.log(`第${count}次，pid=${pid}`);
@@ -192,29 +225,36 @@ async function updateClassificationJson(classification) {
         // const describeTextPath = path.join(folderPath, `${newIndex}.txt`)
         // fs.writeFileSync(describeTextPath, description); // 创建描述文本
 
-        // 下载图片和写入描述信息后，插入数据到 SQLite
+
         // 在插入数据之前，先检查 pid 是否已存在
         try {
-            const row = await dbGet("SELECT pid FROM item WHERE pid = ?", [pid]);
-            
+            const row = await dbGet("SELECT pid, url FROM item WHERE pid = ?", [pid]);
+
             if (row) {
                 console.log(`PID ${pid} 已存在，跳过插入`);
             } else {
+                // 上传图片到Cloudinary
+                console.log(`正在上传 pid=${pid}`);
+                const cloudinaryUrl = await uploadToCloudinary(imageUrl);
+                if (!cloudinaryUrl) {
+                    console.log(`无法上传图片到Cloudinary，跳过 PID: ${pid}`);
+                    continue;
+                }
                 const c0 = folderNames[0] || '';
                 const c1 = folderNames[1] || '';
                 const c2 = folderNames[2] || '';
                 const c3 = folderNames[3] || '';
                 const c4 = folderNames[4] || '';
                 const c5 = folderNames[5] || '';
-                const text = JSON.stringify({describe: description, title: title});
-                
-                console.log(`正在插入 pid=${pid}`);
-                
+                const text = JSON.stringify({ describe: description, title: title });
+
+               
+
                 await dbRun(
                     `INSERT INTO item (url, pid, c0, c1, c2, c3, c4, c5, text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [imageUrl, pid, c0, c1, c2, c3, c4, c5, text]
+                    [cloudinaryUrl, pid, c0, c1, c2, c3, c4, c5, text]
                 );
-                
+
                 console.log(`成功插入数据，PID: ${pid}`);
             }
         } catch (err) {

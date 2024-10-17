@@ -28,9 +28,11 @@ router.post('/record', (req, res) => {
 // 获取历史记录
 router.get('/history', (req, res) => {
     const { username } = req;
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (page - 1) * limit;
     
-    const query = 'SELECT * FROM historyRecords WHERE username = ? ORDER BY timestamp DESC';
-    db.all(query, [username], (err, rows) => {
+    const query = 'SELECT * FROM historyRecords WHERE username = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?';
+    db.all(query, [username, limit, offset], (err, rows) => {
         if (err) {
             console.error('获取历史记录时出错:', err.message);
             return res.status(500).json({ message: "获取历史记录失败" });
@@ -72,9 +74,11 @@ router.post('/favorite', (req, res) => {
 // 获取收藏列表
 router.get('/favorite', (req, res) => {
     const { username } = req;
+    const { page = 1, limit = 15 } = req.query;
+    const offset = (page - 1) * limit;
     
-    const query = 'SELECT * FROM favorites WHERE username = ? ORDER BY timestamp DESC';
-    db.all(query, [username], (err, rows) => {
+    const query = 'SELECT * FROM favorites WHERE username = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?';
+    db.all(query, [username, limit, offset], (err, rows) => {
         if (err) {
             console.error('获取收藏列表时出错:', err.message);
             return res.status(500).json({ message: "获取收藏列表失败" });

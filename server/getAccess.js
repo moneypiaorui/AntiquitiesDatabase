@@ -1,6 +1,5 @@
 const qs = require('querystring');
 const axios = require('axios');
-const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -30,7 +29,7 @@ const shouxiCertSite = 'http://cert.shouxi.com/ajax'
 const imagePath = path.join(__dirname, 'compare/test.jpg');
 const imageBuffer = fs.readFileSync(imagePath);
 
-const getAccess = (imageBuffer) => {
+const getAccess = (imageBuffer, progressCallback) => {
     return new Promise((resolve, reject) => {
         // 指定虚拟环境中的 Python 解释器
         const pythonPath = path.join(__dirname, '..','scanner', 'venv', 'Scripts', 'python.exe');
@@ -38,6 +37,8 @@ const getAccess = (imageBuffer) => {
         const scriptPath = path.join(__dirname, '..', './scanner/scanner.py');
         // 使用虚拟环境中的 Python 解释器执行脚本
         const pythonProcess = spawn(pythonPath, [scriptPath]);
+
+        progressCallback(10); // 开始处理
 
         // 通过 stdin 发送图片数据
         pythonProcess.stdin.write(imageBuffer);
@@ -50,17 +51,19 @@ const getAccess = (imageBuffer) => {
 
             try {
                 scannerData = JSON.parse(data.toString());
+                progressCallback(30); // 扫描完成
             } catch (err) {
                 return reject('Error parsing JSON: ' + err.message);
             }
             if (scannerData.message != 'succeed') {
-                return reject('error: ' + scannerData.message);
+                return reject(scannerData.message);
             }
-
 
             const { code } = scannerData;
             const queryCode = code.slice(-8);
             console.log(scannerData);
+
+            progressCallback(50); // 开始查询
 
             const queryData = {
                 action: 'query_cert',
@@ -71,22 +74,27 @@ const getAccess = (imageBuffer) => {
 
             try {
                 const response = await axios.post(shouxiCertSite, qs.stringify(queryData));
-                const itemInfo = response.data.data.detail_info; // 数组格式
+                const itemInfo = response.data.data.detail_info;
                 console.log(...itemInfo);
+
+                progressCallback(80); // 查询完成
 
                 // 处理图像下载
                 const imgSrcs = response.data.data.img_info;
-                await Promise.all(imgSrcs.map(async (imgSrc, index) => {
-                    const imgPath = path.join(__dirname, 'compare', `reference${index}${path.extname(imgSrc)}`);
+                for (let i = 0; i < imgSrcs.length; i++) {
+                    const imgSrc = imgSrcs[i];
+                    const imgPath = path.join(__dirname, 'compare', `reference${i}${path.extname(imgSrc)}`);
                     try {
                         await downloadImage(imgSrc, imgPath);
                         console.log('Image downloaded successfully:', imgPath);
+                        // 更新进度
+                        progressCallback(80 + Math.floor((i + 1) / imgSrcs.length * 20));
                     } catch (err) {
                         console.error('Error downloading image:', err);
                     }
-                }));
+                }
 
-                // 成功时解析返回 itemInfo
+                progressCallback(100); // 全部完成
                 resolve(itemInfo);
             } catch (err) {
                 reject('Error fetching data: ' + err.message);
