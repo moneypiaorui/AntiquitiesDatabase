@@ -6,7 +6,7 @@ const db = new sqlite3.Database('crawler/item.db', (err) => {
         console.error("Error opening database:", err.message);
         return;
     }
-    console.log("Connected to the SQLite database.");
+    console.log("Connected to the SQLite item database.");
 });
 
 // 创建文件表
