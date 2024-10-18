@@ -13,11 +13,21 @@
   - 后端nodejs基本逻辑实现
   - 前端使用v0+cursor快速构建nextjs项目，实现数据检索+拍照+用户功能+浏览历史+收藏夹功能
   - ~~48h大体完工~~
+- <b>10.15</b>
+  - 云端部署完成，绑定域名并启用https，前端http请求使用后端proxy路由代理避免混合内容异常
+  - 拍照识别的upload路由实现返回SSE流，实现识别进度条功能
+- <b>10.16</b>
+  - 优化图片使用cloudinary存储和加速，不同组件使用不同大小的图片（cloudinary提供），优化用户访问速度
+- <b>10.17</b>
+  - 优化页面栈跳转逻辑，优化浏览器history和返回功能
+- <b>10.18</b>
+  - 尝试apk打包，成功
 
 ## 食用
 - crawler为爬虫，获取数据存在crawler/database中。使用见 crawlerReadme.md
 - 框架设计[预览](https://www.figma.com/design/j27o5VHQvjBkMz9G2uGdEh/Untitled?node-id=0-1&t=va8Xlhoyo5zDSaui-1)
 - 二维码识别：cv2和pyzbar
+- 前端Nextjs，打包后out/内文件放到server/public/下
 
 ## 环境配置
 ### python
@@ -35,13 +45,14 @@
 - 在配置文件next.config.mjs中添加output: 'export'，方便后续打包成静态资源
 - `npm run build`进行打包，如果报很多错可以把eslinetrc.json删了
 - 打包完成后既可以`npm run start`通过node启动，也可以把out/下的资源放到web服务器上
-- 开发环境通过代理将相对路径的请求转发到localhost上，具体见`next.config.js`文件配置
+- ~~开发环境通过代理将相对路径的请求转发到localhost上，具体见`next.config.js`文件配置~~
+- 配置环境变量，开发时候请求host为localhost:5000,生产环境为云服务器域名（暂时antidb.chainpray.com）
 
 ## 代码结构
 ### crawler
 - getDataAll.js通过id检索所有的拍品,单独提取jizhiyinbi类；id范围测试得约为0~1296000，部分id不存在
 - getData3year.js通过搜索页面检索近三年的机制银币（三年是非会员限制），通过设置第一个get请求的per_page字段来改变获取量，比如1000就是获取最近1000个藏品。注意机制银币拍品数量大约是100*585个
-- buildDatabase.js 构建server所需要的item.db 和 传给前端做fliter的classification.json，树形结构存储分类信息
+- buildDatabase.js 构建server所需要的item.db 和 传给前端做fliter的classification.json，树形结构存储分类信息(注：爬取的图片上传到cloudinary加速，数据库存储cloudinary图片信息)
 - classification.json 文物树形关系
 - item.db 文物信息数据库（爬虫爬的）
 ### scanner
@@ -55,8 +66,10 @@
   - artifacts.js 文物相关api
   - userActions.js 主要是历史信息和收藏的api
   - users 登录注册和token验证的路由
+  - proxy 代理http请求(主站是https访问,如果资源访问是http请求存在混合内容异常，需要代理访问)
 - uploads/ 暂存用户上传的图片
 - compare/ 存放比较的图片方便python程序获取和比较
+- cahce/ http代理的缓存
 - public/ 网页静态文件
 ### Nextjs
 - components/app.tsx 是核心文件，因为是v0生成没有做模块分离
@@ -79,14 +92,19 @@
 ## 待办
 ### 爬虫
 - [ ] 有些页面有两张图,暂时只能获取一张
+- [ ] 一个item可以存储多张照片
 - [ ] 详细信息获取和存储
 ### 算法
 - [ ] 实现上传图片和爬取的官网比对，获取匹配率
+- [ ] 二维码识别会因为图片模糊而无法处理，应当增加图像增强and滤波算法
 - [ ] getAccess.js返回比对信息
+- [ ] 知识图谱构建
+- [ ] 无信息银币识别和估值
 ### 前端
-- [ ] 页面构建有点问题，递归栈cursor写的不好
+- [x] 页面构建有点问题，递归栈cursor写的不好
 - [ ] 用户管理系统还没加
 - [ ] 历史记录不能删除检索，且没加离散化功能
+- [ ] Next使用app路由覆写页面栈的逻辑
 ### 后端
 - [ ] 暂时nodejs轻量化实现，后续java覆写
 
